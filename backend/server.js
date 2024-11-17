@@ -10,9 +10,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: 'http://localhost:3000', // Explicitly allow the frontend origin
+    methods: ['GET', 'POST'],        // Allowed HTTP methods
   },
 });
+
 
 // Middleware
 app.use(cors());
@@ -66,21 +68,23 @@ app.get('/api/codeblocks/:id', async (req, res) => {
 
 // WebSocket Events
 io.on('connection', (socket) => {
-  console.log('A user connected');
+  console.log(`WebSocket connected: ${socket.id}`); // Log when a client connects
 
   socket.on('join-room', (roomId) => {
+    console.log(`Socket ${socket.id} joined room: ${roomId}`); // Log when a user joins a room
     socket.join(roomId);
-    console.log(`User joined room: ${roomId}`);
   });
 
   socket.on('code-update', ({ roomId, code }) => {
-    socket.to(roomId).emit('receive-code', code); // Broadcast to other users in the room
+    console.log(`Room ${roomId}: Code updated to:`, code); // Log code updates
+    socket.to(roomId).emit('receive-code', code); // Broadcast updates
   });
 
   socket.on('disconnect', () => {
-    console.log('A user disconnected');
+    console.log(`WebSocket disconnected: ${socket.id}`); // Log when a client disconnects
   });
 });
+
 
 
 // Start Server
