@@ -68,83 +68,67 @@ io.on('connection', (socket) => {
 
   // Handle user joining a room
   socket.on('join-room', (roomId) => {
-  // Initialize the room if it doesn't exist
-  if (!roomUsers[roomId]) {
-    roomUsers[roomId] = [];
-  }
+    if (!roomUsers[roomId]) {
+      roomUsers[roomId] = [];
+    }
 
-  // Check if the user is already in the room
-  const existingUser = roomUsers[roomId].find((user) => user.id === socket.id);
+    const existingUser = roomUsers[roomId].find((user) => user.id === socket.id);
 
-  if (!existingUser) {
-    // Assign role: mentor if no mentor exists, otherwise student
-    const existingMentor = roomUsers[roomId].find((user) => user.role === 'mentor');
-    const role = existingMentor ? 'student' : 'mentor';
+    if (!existingUser) {
+      const existingMentor = roomUsers[roomId].find((user) => user.role === 'mentor');
+      const role = existingMentor ? 'student' : 'mentor';
 
-    // Add the user to the room
-    roomUsers[roomId].push({ id: socket.id, role });
+      roomUsers[roomId].push({ id: socket.id, role });
 
-    console.log(`Socket ${socket.id} joined room: ${roomId} as ${role}`);
-    socket.emit('role-assigned', role);
-    socket.join(roomId);
-  } else {
-    console.log(`Socket ${socket.id} is already in room: ${roomId}`);
-  }
+      console.log(`Socket ${socket.id} joined room: ${roomId} as ${role}`);
+      socket.emit('role-assigned', role);
+      socket.join(roomId);
 
-  // Debugging: Log current room users
-  console.log(`Current users in room ${roomId}:`, roomUsers[roomId]);
-});
+      // Broadcast student count to all users in the room
+      const numStudents = roomUsers[roomId].filter((user) => user.role === 'student').length;
+      io.to(roomId).emit('update-student-count', numStudents);
+    } else {
+      console.log(`Socket ${socket.id} is already in room: ${roomId}`);
+    }
 
+    console.log(`Current users in room ${roomId}:`, roomUsers[roomId]);
+  });
 
   // Handle real-time code updates
   socket.on('code-update', ({ roomId, code }) => {
     console.log(`Room ${roomId}: Code updated to:`, code);
-    socket.to(roomId).emit('receive-code', code); // Broadcast the code update to others in the room
+    socket.to(roomId).emit('receive-code', code);
   });
 
   // Handle user disconnecting
-socket.on('disconnect', () => {
-  console.log(`WebSocket disconnected: ${socket.id}`);
+  socket.on('disconnect', () => {
+    console.log(`WebSocket disconnected: ${socket.id}`);
 
-  for (const room in roomUsers) {
-    // Find the room the user belongs to
-    const userIndex = roomUsers[room].findIndex((user) => user.id === socket.id);
+    for (const room in roomUsers) {
+      const userIndex = roomUsers[room].findIndex((user) => user.id === socket.id);
 
-    if (userIndex !== -1) {
-      const user = roomUsers[room][userIndex];
+      if (userIndex !== -1) {
+        const user = roomUsers[room][userIndex];
+        roomUsers[room].splice(userIndex, 1);
 
-      // Remove the user from the room
-      roomUsers[room].splice(userIndex, 1);
+        // Broadcast updated student count to all users in the room
+        const numStudents = roomUsers[room].filter((user) => user.role === 'student').length;
+        io.to(room).emit('update-student-count', numStudents);
 
-      // If the mentor leaves, notify all students to redirect and reset the room
-      if (user.role === 'mentor') {
-        io.to(room).emit('redirect-to-lobby'); // Notify students
-        console.log(`Mentor left room ${room}. Students have been redirected.`);
+        if (user.role === 'mentor') {
+          io.to(room).emit('redirect-to-lobby');
+          console.log(`Mentor left room ${room}. Students have been redirected.`);
+          delete roomUsers[room];
+        }
 
-        // Reset the room's data (e.g., code block state)
-        const resetCodeBlock = {
-          title: `Room ${room}`, // Example default title
-          initial_template: '', // Default empty template
-          solution: '', // Clear solution
-        };
-        // Optionally, persist reset state to a database or log it
-        console.log(`Code block for room ${room} has been reset:`, resetCodeBlock);
-
-        delete roomUsers[room]; // Clear the room
-      }
-
-      // If the room is now empty, delete it
-      if (roomUsers[room] && roomUsers[room].length === 0) {
-        delete roomUsers[room];
-        console.log(`Room ${room} is now empty and has been deleted.`);
+        if (roomUsers[room] && roomUsers[room].length === 0) {
+          delete roomUsers[room];
+          console.log(`Room ${room} is now empty and has been deleted.`);
+        }
       }
     }
-  }
+  });
 });
-
-
-});
-
 
 // Start Server
 const PORT = process.env.PORT || 4000;

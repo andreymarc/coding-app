@@ -12,6 +12,7 @@ function CodeBlock() {
   const [role, setRole] = useState(''); // User role: mentor or student
   const [loadingRole, setLoadingRole] = useState(true); // Loading state for role
   const [error, setError] = useState(null); // Error state
+  const [studentCount, setStudentCount] = useState(0); // Track number of students
 
   useEffect(() => {
     console.log('Connecting to WebSocket server...');
@@ -37,14 +38,21 @@ function CodeBlock() {
 
     // Listen for mentor disconnect and redirection
     const handleRedirect = () => {
-    console.log('Mentor disconnected. Redirecting to lobby...');
-    setCodeBlock(null); // Clear the code block state
-    setCode(''); // Reset the code editor
-    navigate('/'); // Redirect to the lobby page
+      console.log('Mentor disconnected. Redirecting to lobby...');
+      setCodeBlock(null); // Clear the code block state
+      setCode(''); // Reset the code editor
+      navigate('/'); // Redirect to the lobby page
     };
 
-
     socket.on('redirect-to-lobby', handleRedirect);
+
+    // Listen for student count updates
+    const handleStudentCountUpdate = (count) => {
+      console.log(`Number of students in room: ${count}`);
+      setStudentCount(count); // Update the student count state
+    };
+
+    socket.on('update-student-count', handleStudentCountUpdate);
 
     // Fetch code block data
     fetch(`http://localhost:4000/api/codeblocks/${id}`)
@@ -75,10 +83,11 @@ function CodeBlock() {
     return () => {
       console.log('Disconnecting from WebSocket server...');
       socket.off('role-assigned', handleRoleAssigned);
-      socket.off('redirect-to-lobby', handleRedirect); // Remove redirect listener
+      socket.off('redirect-to-lobby', handleRedirect);
+      socket.off('update-student-count', handleStudentCountUpdate); // Clean up student count listener
       socket.off('receive-code', handleReceiveCode);
     };
-  }, [id, navigate]); // Added navigate to dependency array
+  }, [id, navigate]);
 
   const handleCodeChange = (value) => {
     setCode(value);
@@ -98,6 +107,7 @@ function CodeBlock() {
     <div>
       <h1>{codeBlock.title}</h1>
       <p>{role === 'mentor' ? 'Hello Tom' : 'Hello Student'}</p> {/* Greeting */}
+      <p>Students in room: {studentCount}</p> {/* Display student count */}
       <CodeMirror
         value={code}
         height="400px"
