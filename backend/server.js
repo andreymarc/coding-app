@@ -95,9 +95,24 @@ io.on('connection', (socket) => {
   });
 
   // Handle real-time code updates
-  socket.on('code-update', ({ roomId, code }) => {
+  socket.on('code-update', async ({ roomId, code }) => {
     console.log(`Room ${roomId}: Code updated to:`, code);
+
+    // Broadcast code changes to other users in the room
     socket.to(roomId).emit('receive-code', code);
+
+    try {
+      // Fetch the solution for the code block
+      const codeBlock = await CodeBlock.findById(roomId);
+
+      if (codeBlock && code.trim() === codeBlock.solution.trim()) {
+        console.log(`Room ${roomId}: Solution matched by ${socket.id}!`);
+        // Notify the client who matched the solution
+        socket.emit('solution-matched', true);
+      }
+    } catch (error) {
+      console.error(`Error checking solution for room ${roomId}:`, error);
+    }
   });
 
   // Handle user disconnecting

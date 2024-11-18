@@ -13,6 +13,7 @@ function CodeBlock() {
   const [loadingRole, setLoadingRole] = useState(true); // Loading state for role
   const [error, setError] = useState(null); // Error state
   const [studentCount, setStudentCount] = useState(0); // Track number of students
+  const [solutionMatched, setSolutionMatched] = useState(false); // Track solution matching
 
   useEffect(() => {
     console.log('Connecting to WebSocket server...');
@@ -54,6 +55,14 @@ function CodeBlock() {
 
     socket.on('update-student-count', handleStudentCountUpdate);
 
+    // Listen for solution matching
+    const handleSolutionMatched = () => {
+      console.log('Solution matched! 🎉');
+      setSolutionMatched(true); // Display the smiley face
+    };
+
+    socket.on('solution-matched', handleSolutionMatched);
+
     // Fetch code block data
     fetch(`http://localhost:4000/api/codeblocks/${id}`)
       .then((res) => {
@@ -84,7 +93,8 @@ function CodeBlock() {
       console.log('Disconnecting from WebSocket server...');
       socket.off('role-assigned', handleRoleAssigned);
       socket.off('redirect-to-lobby', handleRedirect);
-      socket.off('update-student-count', handleStudentCountUpdate); // Clean up student count listener
+      socket.off('update-student-count', handleStudentCountUpdate);
+      socket.off('solution-matched', handleSolutionMatched);
       socket.off('receive-code', handleReceiveCode);
     };
   }, [id, navigate]);
@@ -108,6 +118,7 @@ function CodeBlock() {
       <h1>{codeBlock.title}</h1>
       <p>{role === 'mentor' ? 'Hello Tom' : 'Hello Student'}</p> {/* Greeting */}
       <p>Students in room: {studentCount}</p> {/* Display student count */}
+      {solutionMatched && <p>🎉 Correct Solution! 🎉</p>} {/* Smiley Face */}
       <CodeMirror
         value={code}
         height="400px"
