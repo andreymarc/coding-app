@@ -14,6 +14,7 @@ function CodeBlock() {
   const [error, setError] = useState(null); // Error state
   const [studentCount, setStudentCount] = useState(0); // Track number of students
   const [solutionMatched, setSolutionMatched] = useState(false); // Track solution matching
+  const [readOnlyMessage, setReadOnlyMessage] = useState(''); // Message for mentor
 
   useEffect(() => {
     console.log('Connecting to WebSocket server...');
@@ -105,6 +106,11 @@ function CodeBlock() {
     socket.emit('code-update', { roomId: id, code: value });
   };
 
+  const handleMentorEditAttempt = () => {
+    setReadOnlyMessage('You are in read-only mode!');
+    setTimeout(() => setReadOnlyMessage(''), 2000); // Clear the message after 2 seconds
+  };
+
   if (error) {
     return <div>Error: {error}</div>;
   }
@@ -119,12 +125,15 @@ function CodeBlock() {
       <p>{role === 'mentor' ? 'Hello Tom' : 'Hello Student'}</p> {/* Greeting */}
       <p>Students in room: {studentCount}</p> {/* Display student count */}
       {solutionMatched && <p>🎉 Correct Solution! 🎉</p>} {/* Smiley Face */}
+      {readOnlyMessage && <p style={{ color: 'red' }}>{readOnlyMessage}</p>} {/* Read-only message */}
       <CodeMirror
         value={code}
         height="400px"
         extensions={[javascript()]}
-        onChange={role === 'student' ? handleCodeChange : undefined} // Read-only for mentor
-      />
+        editable={role === 'student'} // Prevent edits if the user is a mentor
+        onChange={role === 'student' ? handleCodeChange : handleMentorEditAttempt} // Custom handler for mentor
+/>
+
     </div>
   );
 }
