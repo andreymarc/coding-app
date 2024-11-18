@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom'; // Import useNavigate
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import socket from './socket'; // Shared socket instance
 
 function CodeBlock() {
   const { id } = useParams(); // Room ID from URL
+  const navigate = useNavigate(); // Hook to navigate between pages
   const [codeBlock, setCodeBlock] = useState(null); // Code block data
   const [code, setCode] = useState(''); // Current code in the editor
   const [role, setRole] = useState(''); // User role: mentor or student
@@ -33,6 +34,17 @@ function CodeBlock() {
     };
 
     socket.on('role-assigned', handleRoleAssigned);
+
+    // Listen for mentor disconnect and redirection
+    const handleRedirect = () => {
+    console.log('Mentor disconnected. Redirecting to lobby...');
+    setCodeBlock(null); // Clear the code block state
+    setCode(''); // Reset the code editor
+    navigate('/'); // Redirect to the lobby page
+    };
+
+
+    socket.on('redirect-to-lobby', handleRedirect);
 
     // Fetch code block data
     fetch(`http://localhost:4000/api/codeblocks/${id}`)
@@ -63,9 +75,10 @@ function CodeBlock() {
     return () => {
       console.log('Disconnecting from WebSocket server...');
       socket.off('role-assigned', handleRoleAssigned);
+      socket.off('redirect-to-lobby', handleRedirect); // Remove redirect listener
       socket.off('receive-code', handleReceiveCode);
     };
-  }, [id]);
+  }, [id, navigate]); // Added navigate to dependency array
 
   const handleCodeChange = (value) => {
     setCode(value);

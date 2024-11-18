@@ -103,28 +103,46 @@ io.on('connection', (socket) => {
   });
 
   // Handle user disconnecting
-  socket.on('disconnect', () => {
-    console.log(`WebSocket disconnected: ${socket.id}`);
+socket.on('disconnect', () => {
+  console.log(`WebSocket disconnected: ${socket.id}`);
 
-    for (const room in roomUsers) {
+  for (const room in roomUsers) {
+    // Find the room the user belongs to
+    const userIndex = roomUsers[room].findIndex((user) => user.id === socket.id);
+
+    if (userIndex !== -1) {
+      const user = roomUsers[room][userIndex];
+
       // Remove the user from the room
-      roomUsers[room] = roomUsers[room].filter((user) => user.id !== socket.id);
+      roomUsers[room].splice(userIndex, 1);
 
-      // If the room is empty, delete it
-      if (roomUsers[room].length === 0) {
+      // If the mentor leaves, notify all students to redirect and reset the room
+      if (user.role === 'mentor') {
+        io.to(room).emit('redirect-to-lobby'); // Notify students
+        console.log(`Mentor left room ${room}. Students have been redirected.`);
+
+        // Reset the room's data (e.g., code block state)
+        const resetCodeBlock = {
+          title: `Room ${room}`, // Example default title
+          initial_template: '', // Default empty template
+          solution: '', // Clear solution
+        };
+        // Optionally, persist reset state to a database or log it
+        console.log(`Code block for room ${room} has been reset:`, resetCodeBlock);
+
+        delete roomUsers[room]; // Clear the room
+      }
+
+      // If the room is now empty, delete it
+      if (roomUsers[room] && roomUsers[room].length === 0) {
         delete roomUsers[room];
         console.log(`Room ${room} is now empty and has been deleted.`);
-      } else {
-        // If the mentor leaves, promote the next user to mentor
-        const existingMentor = roomUsers[room].find((user) => user.role === 'mentor');
-        if (!existingMentor) {
-          roomUsers[room][0].role = 'mentor';
-          io.to(roomUsers[room][0].id).emit('role-assigned', 'mentor');
-          console.log(`Promoted ${roomUsers[room][0].id} to mentor in room ${room}`);
-        }
       }
     }
-  });
+  }
+});
+
+
 });
 
 
