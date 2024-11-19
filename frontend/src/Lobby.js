@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 
 function Lobby() {
   const [codeBlocks, setCodeBlocks] = useState([]);
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000'; // Use environment variable or default to localhost
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/codeblocks') // Use the correct backend URL
+    fetch(`${apiUrl}/api/codeblocks`) // Dynamically use the API URL
       .then((response) => {
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
@@ -14,7 +15,7 @@ function Lobby() {
       })
       .then((data) => setCodeBlocks(data))
       .catch((error) => console.error('Error fetching code blocks:', error));
-  }, []);
+  }, [apiUrl]); // Dependency array includes apiUrl
 
   return (
     <div style={styles.container}>

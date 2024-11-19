@@ -19,6 +19,9 @@ function CodeBlock() {
   const [newMessage, setNewMessage] = useState(''); // Input for chat messages
   const chatBoxRef = useRef(null); // Reference for the chat box
 
+  // Get the API base URL from environment variables
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+
   useEffect(() => {
     console.log('Connecting to WebSocket server...');
 
@@ -80,7 +83,7 @@ function CodeBlock() {
     socket.on('receive-message', handleReceiveMessage);
 
     // Fetch code block data
-    fetch(`http://localhost:4000/api/codeblocks/${id}`)
+    fetch(`${apiUrl}/api/codeblocks/${id}`) // Use environment variable for base URL
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch code block');
         return res.json();
@@ -114,7 +117,7 @@ function CodeBlock() {
       socket.off('receive-message', handleReceiveMessage);
       socket.off('receive-code', handleReceiveCode);
     };
-  }, [id, navigate]);
+  }, [id, navigate, apiUrl]);
 
   const handleCodeChange = (value) => {
     setCode(value);
@@ -123,7 +126,6 @@ function CodeBlock() {
   };
 
   const handleMentorEditAttempt = () => {
-    //setReadOnlyMessage('You are in read-only mode!');
     setTimeout(() => setReadOnlyMessage(''), 2000); // Clear the message after 2 seconds
   };
 
