@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom'; // Import useNavigate
+import React, { useEffect, useState, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import socket from './socket'; // Shared socket instance
@@ -15,6 +15,9 @@ function CodeBlock() {
   const [studentCount, setStudentCount] = useState(0); // Track number of students
   const [solutionMatched, setSolutionMatched] = useState(false); // Track solution matching
   const [readOnlyMessage, setReadOnlyMessage] = useState(''); // Message for mentor
+  const [chatMessages, setChatMessages] = useState([]); // Chat messages
+  const [newMessage, setNewMessage] = useState(''); // Input for chat messages
+  const chatBoxRef = useRef(null); // Reference for the chat box
 
   useEffect(() => {
     console.log('Connecting to WebSocket server...');
@@ -64,6 +67,18 @@ function CodeBlock() {
 
     socket.on('solution-matched', handleSolutionMatched);
 
+    // Listen for chat messages
+    const handleReceiveMessage = ({ sender, message }) => {
+      setChatMessages((prevMessages) => [...prevMessages, { sender, message }]);
+
+      // Auto-scroll to the bottom of the chat box
+      if (chatBoxRef.current) {
+        chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+      }
+    };
+
+    socket.on('receive-message', handleReceiveMessage);
+
     // Fetch code block data
     fetch(`http://localhost:4000/api/codeblocks/${id}`)
       .then((res) => {
@@ -96,6 +111,7 @@ function CodeBlock() {
       socket.off('redirect-to-lobby', handleRedirect);
       socket.off('update-student-count', handleStudentCountUpdate);
       socket.off('solution-matched', handleSolutionMatched);
+      socket.off('receive-message', handleReceiveMessage);
       socket.off('receive-code', handleReceiveCode);
     };
   }, [id, navigate]);
@@ -107,8 +123,23 @@ function CodeBlock() {
   };
 
   const handleMentorEditAttempt = () => {
-    setReadOnlyMessage('You are in read-only mode!');
+    //setReadOnlyMessage('You are in read-only mode!');
     setTimeout(() => setReadOnlyMessage(''), 2000); // Clear the message after 2 seconds
+  };
+
+  const handleSendMessage = () => {
+    if (newMessage.trim() === '') return;
+
+    const sender = role === 'mentor' ? 'Tom (Mentor)' : 'Student';
+    socket.emit('chat-message', { roomId: id, message: newMessage, sender });
+
+    setChatMessages((prevMessages) => [...prevMessages, { sender, message: newMessage }]); // Update local state
+    setNewMessage(''); // Clear the input field
+
+    // Auto-scroll to the bottom of the chat box
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    }
   };
 
   if (error) {
@@ -121,19 +152,97 @@ function CodeBlock() {
 
   return (
     <div>
-      <h1>{codeBlock.title}</h1>
-      <p>{role === 'mentor' ? 'Hello Tom' : 'Hello Student'}</p> {/* Greeting */}
-      <p>Students in room: {studentCount}</p> {/* Display student count */}
-      {solutionMatched && <p>🎉 Correct Solution! 🎉</p>} {/* Smiley Face */}
-      {readOnlyMessage && <p style={{ color: 'red' }}>{readOnlyMessage}</p>} {/* Read-only message */}
+      <h1 style={{ color: '#4A90E2', textAlign: 'center' }}>{codeBlock.title}</h1>
+      <p style={{ textAlign: 'center', fontWeight: 'bold' }}>
+        {role === 'mentor' ? 'Hello Tom' : 'Hello Student'}
+      </p>
+      <p style={{ textAlign: 'center' }}>Students in room: {studentCount}</p>
+      {solutionMatched && (
+        <div style={{ fontSize: '4rem', textAlign: 'center', margin: '20px 0', color: '#4CAF50' }}>
+          😄
+        </div>
+      )}
+      {readOnlyMessage && <p style={{ color: 'red', textAlign: 'center' }}>{readOnlyMessage}</p>}
       <CodeMirror
         value={code}
         height="400px"
         extensions={[javascript()]}
-        editable={role === 'student'} // Prevent edits if the user is a mentor
-        onChange={role === 'student' ? handleCodeChange : handleMentorEditAttempt} // Custom handler for mentor
-/>
+        editable={role === 'student'}
+        onChange={role === 'student' ? handleCodeChange : handleMentorEditAttempt}
+      />
 
+      {/* Chat Section */}
+      <div
+        style={{
+          marginTop: '20px',
+          border: '1px solid #ccc',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          backgroundColor: '#f9f9f9',
+        }}
+      >
+        <h2 style={{ backgroundColor: '#4A90E2', color: 'white', margin: 0, padding: '10px' }}>
+          Chat
+        </h2>
+        <div
+          ref={chatBoxRef}
+          style={{
+            height: '200px',
+            overflowY: 'auto',
+            padding: '10px',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          {chatMessages.map((msg, index) => (
+            <p
+              key={index}
+              style={{
+                margin: '5px 0',
+                color: msg.sender.includes('Mentor') ? '#4A90E2' : '#333',
+                fontWeight: msg.sender.includes('Mentor') ? 'bold' : 'normal',
+              }}
+            >
+              <strong>{msg.sender}:</strong> {msg.message}
+            </p>
+          ))}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            padding: '10px',
+            borderTop: '1px solid #ccc',
+            backgroundColor: '#f1f1f1',
+          }}
+        >
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            placeholder="Type a message..."
+            style={{
+              flex: 1,
+              padding: '10px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              marginRight: '10px',
+            }}
+          />
+          <button
+            onClick={handleSendMessage}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#4A90E2',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            Send
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -107,12 +107,18 @@ io.on('connection', (socket) => {
 
       if (codeBlock && code.trim() === codeBlock.solution.trim()) {
         console.log(`Room ${roomId}: Solution matched by ${socket.id}!`);
-        // Notify the client who matched the solution
-        socket.emit('solution-matched', true);
+        // Notify all users in the room about the solution match
+        io.to(roomId).emit('solution-matched', true);
       }
     } catch (error) {
       console.error(`Error checking solution for room ${roomId}:`, error);
     }
+  });
+
+  // Handle chat messages
+  socket.on('chat-message', ({ roomId, message, sender }) => {
+    console.log(`Chat in room ${roomId} - ${sender}: ${message}`);
+    io.to(roomId).emit('receive-message', { message, sender }); // Emit only once to all in room
   });
 
   // Handle user disconnecting
@@ -126,7 +132,7 @@ io.on('connection', (socket) => {
         const user = roomUsers[room][userIndex];
         roomUsers[room].splice(userIndex, 1);
 
-        // Broadcast updated student count to all users in the room
+        // Message updated student count to all users in the room
         const numStudents = roomUsers[room].filter((user) => user.role === 'student').length;
         io.to(room).emit('update-student-count', numStudents);
 
